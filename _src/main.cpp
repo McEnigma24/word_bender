@@ -3,11 +3,12 @@
 #include <unordered_map>
 #include <map>
 #include <string>
+#include <optional>
 
 typedef std::unordered_map<std::string, char> check_map_t;
 // typedef std::map<std::string, char> check_map_t;
 
-std::unordered_map<char, u8> letter_values = {
+std::unordered_map<char, i8> letter_values = {
     {'a', 1},   // 1
     {'ą', 5},   // 2
     {'b', 3},   // 3
@@ -136,17 +137,19 @@ check_map_t buildCheckMap(const std::string& filename)
     return check_map;
 }
 
-constexpr u8 gameboard_height = 15;
-constexpr u8 gameboard_width = 15;
-constexpr u8 max_number_of_user_letters = 7;
+constexpr i8 gameboard_height = 15;
+constexpr i8 gameboard_width = 15;
+constexpr i8 max_number_of_user_letters = 7;
 
 struct cell
 {
     char current_letter = 0;
-    u8 multiplyer_word = 1;
-    u8 multiplyer_letter = 1;
+    i8 multiplyer_word = 1;
+    i8 multiplyer_letter = 1;
 
-    cell(const u8 mult_word = 1, const u8 mult_letter = 1)
+    bool fleshlyAdded = false;
+
+    cell(const i8 mult_word = 1, const i8 mult_letter = 1)
     : multiplyer_word(mult_word)
     , multiplyer_letter(mult_letter)
     {
@@ -162,8 +165,8 @@ class GameState
 {
     struct xyCoord
     {
-        u8 x;
-        u8 y;
+        i8 x;
+        i8 y;
     }
 
     struct WordPositionOnAGameboard
@@ -311,12 +314,84 @@ class GameState
         }
     }
 
+    std::optional<i8> returnClampedCoordToBoard_Y(const i8 y, const i8 modifier)
+    {
+        i8 result = y + modifier;
+
+        if(0 <= result && result < gameboard_height) return y;
+
+        return std::nullopt;
+    }
+
+    std::optional<i8> returnClampedCoordToBoard_X(const i8 x, const i8 modifier)
+    {
+        i8 result = x + modifier;
+
+        if(0 <= result && result < gameboard_width) return x;
+
+        return std::nullopt;
+    }
 
     std::vector<WordPositionOnAGameboard> getNewlyCreatedWords(const gameboard_t &pMap, const WordPositionOnAGameboard addedLetters)
     {
+        std::vector<WordPositionOnAGameboard> ret;
+        ret.push_back(addedLetters); // inserting the added word just by itself
+
+
+
         // check if it touches any other letters //
 
-        //
+        // +1 and -1      clamped to GameBoardDimentions
+
+        if(addedLetters.isWordLeftRight())
+        {
+            i8 x_min = addedLetters.start.x;
+            i8 x_max = addedLetters.end.x;
+
+            i8 y = addedLetters.start.y;
+
+            for(i8 x = x_min; x < x_max; x++)
+            {
+                // checking if cell -1 or +1 on Y is occupied with old letter
+
+                // x, y
+
+                auto top_y    = returnClampedCoordToBoard_Y(y, -1);
+                auto bottom_y = returnClampedCoordToBoard_Y(y, +1);
+
+                if (top_y && bottom_y) // both are present -> its for sure not counter as new word
+                {
+                    continue;
+                }
+
+                if (top_y || bottom_y) // we got ourself w new word
+                {
+                    if (top_y)
+                    {
+                        // we got UP as far are the word goes AND as far as board goes
+
+                        ...
+                    }
+
+                    if (bottom_y)
+                    {
+                        // we got DOWN as far are the word goes AND as far as board goes
+
+                        ...
+                    }
+                }
+            }
+        }
+        else if (addedLetters.isWordTopDown())
+        {
+            // same stuff here
+
+            ...
+        }
+        else
+        {
+            CRASH_LOG("fuck !!!");
+        }
     }
 
     // jak sprawdzamy to od razu wsadzamy do mapy -> tworzymy kopię mapy za każdym razem kiedy podrzucamy nowe słowo do sprawdzenia
@@ -351,7 +426,7 @@ class GameState
 
     std::vector<char> = { 0 }; // max_number_of_user_letters
 
-    // identyfikujemy wszystkie miejsca zaczepu -> pola przez które może przechodzić albo do których można dołączyć wyraz
+    // identyfikujemy wszystkie miejsca zaczepu -> pola przez które może przechodzić albo do których można dołączyć litery
     // przedstawimy je jako paski przed i po
     //
     // że tutaj może się kończyć, tutaj może się zaczynać albo tutaj może być tak po prostu
