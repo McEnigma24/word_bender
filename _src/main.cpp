@@ -232,13 +232,17 @@ class GameState
         i8 x;
         i8 y;
 
-        bool operator==(const xyCoord& other)
+        bool operator==(const xyCoord& other) const
         {
             return ((this->x == other.x) && (this->y == other.y));
         }
-        bool operator!=(const xyCoord& other)
+        bool operator!=(const xyCoord& other) const
         {
             return not this->operator==(other);
+        }
+        bool operator<(const xyCoord& other) const
+        {
+            return (y < other.y) || (y == other.y && x < other.x);
         }
 
         void operator=(const xyCoord& other)
@@ -741,7 +745,7 @@ class GameState
         {
             const auto& cell = pMap[y][x];
 
-            if(cell.letter != 0)
+            if(cell.current_letter != 0)
             {
                 // teraz idziemy na około niej góra-dół-lewo-prawo
 
@@ -754,15 +758,17 @@ class GameState
 
                     const auto& check_cell = pMap[yy][xx];
 
-                    if(check_cell.letter == 0)
+                    if(check_cell.current_letter == 0)
                     {
                         // we add empty cells
 
-                        uniqueCoords.insert(xyCoord(xx, yy));
+                        uniqueCoords.insert(xyCoord{static_cast<i8>(xx), static_cast<i8>(yy)});
                     }
                 }
             }
         }
+
+        return std::vector<xyCoord>(uniqueCoords.begin(), uniqueCoords.end());
     }
 
     void goingOverAllPossibleCombinations()
@@ -793,8 +799,8 @@ class GameState
 
 
                         const int y = pos.y;
-                        int x = std::clamp(pos.x - distance, 0, gameboard_width);
-                        int x_end = std::clamp(pos.x, 0, gameboard_width);
+                        int x = std::clamp(static_cast<int>(pos.x) - distance, 0, static_cast<int>(gameboard_width));
+                        int x_end = std::clamp(static_cast<int>(pos.x), 0, static_cast<int>(gameboard_width));
                         int letters_index = 0;
 
                         WordPositionOnAGameboard placedWord;
@@ -805,7 +811,7 @@ class GameState
                         {
                             // -> now lets place the letters //
 
-                            if(gameboardCopy[y][x].letter != 0) // cell occupied //
+                            if(gameboardCopy[y][x].current_letter != 0) // cell occupied //
                             {
                                 x_end++;
                                 continue;
@@ -814,7 +820,7 @@ class GameState
                             {
                                 const auto letter = letters[letters_index ++];
 
-                                gameboardCopy[y][x].letter = letter;
+                                gameboardCopy[y][x].current_letter = letter;
                                 placedWord.letters += letter;
                             }
                         }
@@ -841,8 +847,8 @@ class GameState
 
 
                         const int x = pos.x;
-                        int y = std::clamp(pos.y - distance, 0, gameboard_height);
-                        int y_end = std::clamp(pos.y, 0, gameboard_height);
+                        int y = std::clamp(static_cast<int>(pos.y) - distance, 0, static_cast<int>(gameboard_height));
+                        int y_end = std::clamp(static_cast<int>(pos.y), 0, static_cast<int>(gameboard_height));
                         int letters_index = 0;
 
                         WordPositionOnAGameboard placedWord;
@@ -853,7 +859,7 @@ class GameState
                         {
                             // -> now lets place the letters //
 
-                            if(gameboardCopy[y][x].letter != 0) // cell occupied //
+                            if(gameboardCopy[y][x].current_letter != 0) // cell occupied //
                             {
                                 y_end++;
                                 continue;
@@ -862,7 +868,7 @@ class GameState
                             {
                                 const auto letter = letters[letters_index ++];
 
-                                gameboardCopy[y][x].letter = letter;
+                                gameboardCopy[y][x].current_letter = letter;
                                 placedWord.letters += letter;
                             }
                         }
@@ -885,11 +891,11 @@ class GameState
         }
 
         line("Found it");
-        varr(currentBestEvaluation.start.x);
-        var(currentBestEvaluation.start.y);
-        varr(currentBestEvaluation.end.x);
-        var(currentBestEvaluation.end.y);
-        var(currentBestEvaluation.letters);
+        varr(currentBestWord.start.x);
+        var(currentBestWord.start.y);
+        varr(currentBestWord.end.x);
+        var(currentBestWord.end.y);
+        var(currentBestWord.letters);
     }
 };
 
@@ -904,7 +910,7 @@ int main()
     std::ifstream file("input/gameState.json");
     if (!file.is_open())
     {
-        std::cerr << "Error: Could not open file input/test.json" << std::endl;
+        std::cerr << "Error: Could not open file input/gameState.json" << std::endl;
         return 1;
     }
 
@@ -965,7 +971,7 @@ int main()
 
 
 // #ifdef BUILD_EXECUTABLE
-#ifdef 0
+#if 0
 int main(int argc, char* argv[])
 {
     time_stamp("main starting");
