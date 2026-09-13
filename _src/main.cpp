@@ -328,6 +328,8 @@ class GameState
 
     std::vector<char> availableLetters;
 
+
+    public:
     GameState()
     {
         time_stamp("Starting GameState constructor");
@@ -343,11 +345,70 @@ class GameState
         // for(auto& [key, value] : check_map) std::cout << key << " : " << (int)value << std::endl;
 
 
+
         // initialize letters on map with JSON input //
 
+        // Parse JSON from file
+        std::ifstream file("input/gameState.json");
+        if (!file.is_open())
+        {
+            std::cerr << "Error: Could not open file input/gameState.json" << std::endl;
+            return;
+        }
 
+        nlohmann::json json_data;
+        file >> json_data;
+        file.close();
+
+        // Display all values
+        // std::cout << "\n=== JSON Content ===" << std::endl;
+        // std::cout << json_data.dump(4) << std::endl;
+
+        // std::cout << "\n=== Parsed Values ===" << std::endl;
+
+
+
+        if (json_data.contains("user_letters") && json_data["user_letters"].is_array())
+        {
+            availableLetters.clear();
+
+            for (const auto& letter_json : json_data["user_letters"])
+            {
+                if (!letter_json.is_string())
+                    continue;
+
+                const std::string letter = letter_json.get<std::string>();
+                if (letter.empty())
+                    continue;
+
+                availableLetters.push_back(letter[0]);
+            }
+        }
+
+        if (json_data.contains("board") && json_data["board"].is_array())
+        {
+            const auto& board_json = json_data["board"];
+            if (board_json.size() != gameboard_height) FATAL_ERROR("board height mismatch");
+
+            for (size_t y = 0; y < board_json.size(); y++)
+            {
+                if (!board_json[y].is_array() || board_json[y].size() != gameboard_width) FATAL_ERROR("board row width mismatch");
+
+                for (size_t x = 0; x < board_json[y].size(); x++)
+                {
+                    char letter = 0;
+                    if (board_json[y][x].is_string())
+                    {
+                        const std::string s = board_json[y][x].get<std::string>();
+                        if (!s.empty())
+                            letter = s[0];
+                    }
+                    // tylko litera — mnożniki zostają z domyślnej planszy
+                    mGameboard[y][x].current_letter = letter;
+                }
+            }
+        }
     }
-
 
     bool isWordPresentInDict(const std::string& word)
     {
@@ -724,13 +785,7 @@ class GameState
         return sum;
     }
 
-    // identyfikujemy wszystkie miejsca zaczepu -> pola przez które może przechodzić albo do których można dołączyć litery
-    // przedstawimy je jako paski przed i po
-    //
-    // że tutaj może się kończyć, tutaj może się zaczynać albo tutaj może być tak po prostu
-    // te paski będziemy rozszeżać w zależności od tego jak długie słowo chcemy zmieścić -> zaczynamy od 2 kończymy na 7
 
-    // dokładamy kompletnie losowo, po prostu wszystkie kombinacje przechodzimy i kolejność ma znaczenia -> czyli chyba tylko silnia jedno przejście -> jakby 7, 6, 5, 4, i bez powtarzania tej samej litery, czyli właśnie maleje ilość dostępnych
 
     std::vector<xyCoord> getAllPositionsToCheck(const gameboard_t &pMap)
     {
@@ -741,12 +796,15 @@ class GameState
         const auto max_Y = pMap.size();
         const auto max_X = pMap[0].size();
 
+        bool wholeMapIsEmpty = true;
+
         for(int y=0; y < max_Y; y++) for(int x=0; x < max_X; x++)
         {
             const auto& cell = pMap[y][x];
 
             if(cell.current_letter != 0)
             {
+                wholeMapIsEmpty = false;
                 // teraz idziemy na około niej góra-dół-lewo-prawo
 
                 for(int yy=y-1; yy < y+1; yy++) for(int xx=x-1; xx < x+1; xx++)
@@ -766,6 +824,11 @@ class GameState
                     }
                 }
             }
+        }
+
+        if(wholeMapIsEmpty)
+        {
+            uniqueCoords.insert(xyCoord{static_cast<i8>(7), static_cast<i8>(7)}); // if empty we add the middle one
         }
 
         return std::vector<xyCoord>(uniqueCoords.begin(), uniqueCoords.end());
@@ -891,113 +954,25 @@ class GameState
         }
 
         line("Found it");
-        varr(currentBestWord.start.x);
-        var(currentBestWord.start.y);
-        varr(currentBestWord.end.x);
-        var(currentBestWord.end.y);
+        varr((int)currentBestWord.start.x);
+        var((int)currentBestWord.start.y);
+        varr((int)currentBestWord.end.x);
+        var((int)currentBestWord.end.y);
+
         var(currentBestWord.letters);
     }
 };
 
 
 
-
-
-
-int main()
-{
-    // Parse JSON from file
-    std::ifstream file("input/gameState.json");
-    if (!file.is_open())
-    {
-        std::cerr << "Error: Could not open file input/gameState.json" << std::endl;
-        return 1;
-    }
-
-    nlohmann::json json_data;
-    file >> json_data;
-    file.close();
-
-    // Display all values
-    std::cout << "\n=== JSON Content ===" << std::endl;
-    std::cout << json_data.dump(4) << std::endl;
-
-    std::cout << "\n=== Parsed Values ===" << std::endl;
-
-    /*
-    if (json_data.contains("Messages") && json_data["Messages"].is_array())
-    {
-        for (size_t i = 0; i < json_data["Messages"].size(); ++i)
-        {
-            const auto& message = json_data["Messages"][i];
-
-            std::cout << "\n--- Message " << i << " ---" << std::endl;
-
-            if (message.contains("tytle")) { std::cout << "Title: " << message["tytle"].get<std::string>() << std::endl; }
-
-            // Display var_a
-            if (message.contains("var_a"))
-            {
-                const auto& var_a = message["var_a"];
-                std::cout << "\nvar_a:" << std::endl;
-                if (var_a.contains("type")) std::cout << "  type: " << var_a["type"].get<std::string>() << std::endl;
-                if (var_a.contains("required")) std::cout << "  required: " << var_a["required"].get<bool>() << std::endl;
-                if (var_a.contains("range"))
-                {
-                    std::cout << "  range: [" << var_a["range"][0].get<int>() << ", " << var_a["range"][1].get<int>() << "]" << std::endl;
-                }
-                if (var_a.contains("default")) std::cout << "  default: " << var_a["default"].get<int>() << std::endl;
-            }
-
-            // Display var_b
-            if (message.contains("var_b"))
-            {
-                const auto& var_b = message["var_b"];
-                std::cout << "\nvar_b:" << std::endl;
-                if (var_b.contains("type")) std::cout << "  type: " << var_b["type"].get<std::string>() << std::endl;
-                if (var_b.contains("required")) std::cout << "  required: " << var_b["required"].get<bool>() << std::endl;
-                if (var_b.contains("range"))
-                {
-                    std::cout << "  range: [" << var_b["range"][0].get<int>() << ", " << var_b["range"][1].get<int>() << "]" << std::endl;
-                }
-                if (var_b.contains("default")) std::cout << "  default: " << var_b["default"].get<int>() << std::endl;
-            }
-        }
-    }
-    */
-
-    return 0;
-}
-
-
-// #ifdef BUILD_EXECUTABLE
-#if 0
+#ifdef BUILD_EXECUTABLE
 int main(int argc, char* argv[])
 {
     time_stamp("main starting");
 
-    std::vector<char> input_elements{'a', 'b', 'c', 'd', 'e'};
+    GameState game;
 
-
-
-    Permutator permute(input_elements);
-    for(const auto& permutation : permute.getPermutations(3))
-    {
-        var(permutation);
-    }
-    time_stamp("ready");
-
-    for(const auto& permutation : permute.getPermutations(2))
-    {
-        var(permutation);
-    }
-    time_stamp("ready");
-
-    for(const auto& permutation : permute.getPermutations(1))
-    {
-        var(permutation);
-    }
-    time_stamp("ready");
+    game.goingOverAllPossibleCombinations();
 
     return 0;
 }
