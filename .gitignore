@@ -7,3 +7,5 @@ log/
 output/
 
 input/rest
+
+core*

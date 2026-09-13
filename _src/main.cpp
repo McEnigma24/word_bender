@@ -4,6 +4,7 @@
 
 #include "__preprocessor__.h"
 
+#include <cctype>
 #include <unordered_map>
 #include <map>
 #include <string>
@@ -299,6 +300,19 @@ class GameState
             this->end = other.end;
             this->letters = other.letters;
         }
+
+        bool isThisCordPresentInWord(const xyCoord& coord) const
+        {
+            if(isWordLeftRight())
+            {
+                return ((start.x <= coord.x) && (coord.x <= end.x))         && ((start.y == coord.y) && (coord.y == end.y));
+            }
+            else if(isWordTopDown())
+            {
+                return ((start.y <= coord.y) && (coord.y <= end.y))         && ((start.x == coord.x) && (coord.x == end.x));
+            }
+            else { FATAL_ERROR("fuuuck"); }
+        }
     };
 
 
@@ -404,15 +418,74 @@ class GameState
                             letter = s[0];
                     }
                     // tylko litera — mnożniki zostają z domyślnej planszy
-                    mGameboard[y][x].current_letter = letter;
+
+                    if(letter == ' ') letter = 0;
+
+                    mGameboard[y][x].current_letter = (char)std::tolower(letter);
                 }
             }
+        }
+    }
+
+
+    #define pp(x) cout << x << " ";
+    #define p(x) cout << x << "\n";
+
+    void printGameBoard(const WordPositionOnAGameboard& currentBestWord)
+    {
+        auto copyGameboard = mGameboard;
+
+        const int max_Y = static_cast<int>(copyGameboard.size());
+        const int max_X = static_cast<int>(copyGameboard[0].size());
+
+        int letter_index = 0;
+
+        for(int y=-1; y < max_Y + 1; y++)
+        {
+            for(int x=-1; x < max_X + 1; x++)
+            {
+                if(y == -1 && x == -1) { pp("  "); continue; }
+                if(y == -1 && x == max_X) { pp("  "); continue; }
+                if(y == max_Y && x == -1) { pp("  "); continue; }
+                if(y == max_Y && x == max_X) { pp("  "); continue; }
+
+                if(y == -1)     { char c = 65 + x; pp(c); continue; }
+                if(y == max_Y)  { char c = 65 + x; pp(c); continue; }
+
+                if(x == -1)     { int val = y+1; if(val<10) pp(""); pp(y+1); continue; }
+                if(x == max_X)  { int val = y+1; pp(y+1); continue; }
+
+                char letter = copyGameboard[y][x].current_letter;
+                if(letter != 0)
+                {
+                    pp(letter);
+                    if(currentBestWord.isThisCordPresentInWord(xyCoord(x, y))) {letter_index++;}
+                }
+                else
+                {
+                    if(currentBestWord.isThisCordPresentInWord(xyCoord(x, y)))
+                    {
+                        pp(static_cast<char>(std::toupper(static_cast<unsigned char>(currentBestWord.letters[letter_index++]))));
+                    }
+                    else
+                    {
+                        pp(" ");
+                    }
+                }
+            }
+            p("");
         }
     }
 
     bool isWordPresentInDict(const std::string& word)
     {
         return check_map.contains(word);
+    }
+
+    // pojedyncza litera nie tworzy słowa - sprawdzamy tylko sekwencje od 2 liter w górę
+    bool isSequenceLegal(const std::string& sequence)
+    {
+        return (sequence.size() < 2) || isWordPresentInDict(sequence);
     }
 
     bool checkIfWordsAreLegal(const gameboard_t& pMap)
@@ -441,7 +514,7 @@ class GameState
 
                         // got to check the current_word that accumulated //
 
-                        if(not isWordPresentInDict(current_word))
+                        if(not isSequenceLegal(current_word))
                         {
                             return false;
                         }
@@ -456,6 +529,9 @@ class GameState
                     current_word += letter;
                 }
             }
+
+            if(word_started && not isSequenceLegal(current_word))
+                return false;
         }
 
         // top -> bottom //
@@ -479,7 +555,7 @@ class GameState
 
                         // got to check the current_word that accumulated //
 
-                        if(not isWordPresentInDict(current_word))
+                        if(not isSequenceLegal(current_word))
                         {
                             return false;
                         }
@@ -494,14 +570,19 @@ class GameState
                     current_word += letter;
                 }
             }
+
+            if(word_started && not isSequenceLegal(current_word))
+                return false;
         }
+
+        return true;
     }
 
     std::optional<i8> returnClampedCoordToBoard_Y(const i8 y, const i8 modifier)
     {
         i8 result = y + modifier;
 
-        if(0 <= result && result < gameboard_height) return y;
+        if(0 <= result && result < gameboard_height) return result;
 
         return std::nullopt;
     }
@@ -510,7 +591,7 @@ class GameState
     {
         i8 result = x + modifier;
 
-        if(0 <= result && result < gameboard_width) return x;
+        if(0 <= result && result < gameboard_width) return result;
 
         return std::nullopt;
     }
@@ -531,7 +612,7 @@ class GameState
             i8 x_min = addedLetters.start.x;
             i8 x_max = addedLetters.end.x;
 
-            for(i8 x = x_min; x < x_max; x++)
+            for(i8 x = x_min; x <= x_max; x++)
             {
                 i8 y = addedLetters.start.y;
 
@@ -565,12 +646,9 @@ class GameState
 
                         // we got UP as far as the word goes AND as far as board goes
 
-                        while(true)
+                        while((0 < y) && (pMap[y - 1][x].current_letter != 0))
                         {
                             y--;
-
-                            if(not (0 <= y)) break;
-                            if(not (pMap[y][x].current_letter != 0)) break;
                         }
 
                         // y_max //
@@ -594,12 +672,9 @@ class GameState
 
                         // we got DOWN as far are the word goes AND as far as board goes
 
-                        while(true)
+                        while((y < gameboard_height - 1) && (pMap[y + 1][x].current_letter != 0))
                         {
                             y++;
-
-                            if(not (y < gameboard_height)) break;
-                            if(not (pMap[y][x].current_letter != 0)) break;
                         }
 
                         // y_max //
@@ -619,7 +694,7 @@ class GameState
             i8 y_min = addedLetters.start.y;
             i8 y_max = addedLetters.end.y;
 
-            for(i8 y = y_min; y < y_max; y++)
+            for(i8 y = y_min; y <= y_max; y++)
             {
                 i8 x = addedLetters.start.x;
 
@@ -653,12 +728,9 @@ class GameState
 
                         // we got LEFT as far as the word goes AND as far as board goes
 
-                        while(true)
+                        while((0 < x) && (pMap[y][x - 1].current_letter != 0))
                         {
                             x--;
-
-                            if(not (0 <= x)) break;
-                            if(not (pMap[y][x].current_letter != 0)) break;
                         }
 
                         // x_max //
@@ -682,12 +754,9 @@ class GameState
 
                         // we got RIGHT as far are the word goes AND as far as board goes
 
-                        while(true)
+                        while((x < gameboard_width - 1) && (pMap[y][x + 1].current_letter != 0))
                         {
                             x++;
-
-                            if(not (x < gameboard_width)) break;
-                            if(not (pMap[y][x].current_letter != 0)) break;
                         }
 
                         // x_max //
@@ -807,12 +876,12 @@ class GameState
                 wholeMapIsEmpty = false;
                 // teraz idziemy na około niej góra-dół-lewo-prawo
 
-                for(int yy=y-1; yy < y+1; yy++) for(int xx=x-1; xx < x+1; xx++)
+                for(int yy=y-1; yy <= y+1; yy++) for(int xx=x-1; xx <= x+1; xx++)
                 {
-                    if(not (0 < yy && yy < gameboard_height)) continue;
-                    if(not (0 < xx && xx < gameboard_width)) continue;
+                    if(not (0 <= yy && yy < gameboard_height)) continue;
+                    if(not (0 <= xx && xx < gameboard_width)) continue;
                     if(yy == y && xx == x) continue;
-                    if(std::abs(yy) == 1 && std::abs(xx) == 1) continue;
+                    if(std::abs(yy - y) == 1 && std::abs(xx - x) == 1) continue;
 
                     const auto& check_cell = pMap[yy][xx];
 
@@ -840,7 +909,6 @@ class GameState
 
         Permutator permute(availableLetters);
         int maxStencilSize = std::min((int)availableLetters.size(), (int)7);
-
 
         // best move so far //
         WordPositionOnAGameboard currentBestWord;
@@ -877,6 +945,7 @@ class GameState
                             if(gameboardCopy[y][x].current_letter != 0) // cell occupied //
                             {
                                 x_end++;
+                                placedWord.letters += gameboardCopy[y][x].current_letter;
                                 continue;
                             }
                             else
@@ -888,7 +957,7 @@ class GameState
                             }
                         }
 
-                        placedWord.end.x = x;
+                        placedWord.end.x = x - 1;
                         placedWord.end.y = y;
 
                         // now lets evaluate it //
@@ -925,6 +994,7 @@ class GameState
                             if(gameboardCopy[y][x].current_letter != 0) // cell occupied //
                             {
                                 y_end++;
+                                placedWord.letters += gameboardCopy[y][x].current_letter;
                                 continue;
                             }
                             else
@@ -937,7 +1007,7 @@ class GameState
                         }
 
                         placedWord.end.x = x;
-                        placedWord.end.y = y;
+                        placedWord.end.y = y - 1;
 
                         // now lets evaluate it added word //
 
@@ -958,10 +1028,13 @@ class GameState
         var((int)currentBestWord.start.y);
         varr((int)currentBestWord.end.x);
         var((int)currentBestWord.end.y);
-        
+
         var((int)currentBestEvaluation);
 
         var(currentBestWord.letters);
+
+
+        printGameBoard(currentBestWord);
     }
 };
 
@@ -973,7 +1046,6 @@ int main(int argc, char* argv[])
     time_stamp("main starting");
 
     GameState game;
-
     game.goingOverAllPossibleCombinations();
 
     return 0;
