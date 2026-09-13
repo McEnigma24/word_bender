@@ -1,5 +1,6 @@
 // #include <bitset>
 #include <boost/dynamic_bitset.hpp>
+#include "json.hpp" // external lib
 
 #include "__preprocessor__.h"
 
@@ -9,6 +10,7 @@
 #include <optional>
 #include <set>
 #include <cmath>
+
 
 typedef std::unordered_map<std::string, char> check_map_t;
 // typedef std::map<std::string, char> check_map_t;
@@ -339,7 +341,7 @@ class GameState
 
         // initialize letters on map with JSON input //
 
-        
+
     }
 
 
@@ -896,10 +898,74 @@ class GameState
 
 
 
+int main()
+{
+    // Parse JSON from file
+    std::ifstream file("input/gameState.json");
+    if (!file.is_open())
+    {
+        std::cerr << "Error: Could not open file input/test.json" << std::endl;
+        return 1;
+    }
+
+    nlohmann::json json_data;
+    file >> json_data;
+    file.close();
+
+    // Display all values
+    std::cout << "\n=== JSON Content ===" << std::endl;
+    std::cout << json_data.dump(4) << std::endl;
+
+    std::cout << "\n=== Parsed Values ===" << std::endl;
+
+    /*
+    if (json_data.contains("Messages") && json_data["Messages"].is_array())
+    {
+        for (size_t i = 0; i < json_data["Messages"].size(); ++i)
+        {
+            const auto& message = json_data["Messages"][i];
+
+            std::cout << "\n--- Message " << i << " ---" << std::endl;
+
+            if (message.contains("tytle")) { std::cout << "Title: " << message["tytle"].get<std::string>() << std::endl; }
+
+            // Display var_a
+            if (message.contains("var_a"))
+            {
+                const auto& var_a = message["var_a"];
+                std::cout << "\nvar_a:" << std::endl;
+                if (var_a.contains("type")) std::cout << "  type: " << var_a["type"].get<std::string>() << std::endl;
+                if (var_a.contains("required")) std::cout << "  required: " << var_a["required"].get<bool>() << std::endl;
+                if (var_a.contains("range"))
+                {
+                    std::cout << "  range: [" << var_a["range"][0].get<int>() << ", " << var_a["range"][1].get<int>() << "]" << std::endl;
+                }
+                if (var_a.contains("default")) std::cout << "  default: " << var_a["default"].get<int>() << std::endl;
+            }
+
+            // Display var_b
+            if (message.contains("var_b"))
+            {
+                const auto& var_b = message["var_b"];
+                std::cout << "\nvar_b:" << std::endl;
+                if (var_b.contains("type")) std::cout << "  type: " << var_b["type"].get<std::string>() << std::endl;
+                if (var_b.contains("required")) std::cout << "  required: " << var_b["required"].get<bool>() << std::endl;
+                if (var_b.contains("range"))
+                {
+                    std::cout << "  range: [" << var_b["range"][0].get<int>() << ", " << var_b["range"][1].get<int>() << "]" << std::endl;
+                }
+                if (var_b.contains("default")) std::cout << "  default: " << var_b["default"].get<int>() << std::endl;
+            }
+        }
+    }
+    */
+
+    return 0;
+}
 
 
-
-#ifdef BUILD_EXECUTABLE
+// #ifdef BUILD_EXECUTABLE
+#ifdef 0
 int main(int argc, char* argv[])
 {
     time_stamp("main starting");

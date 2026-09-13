@@ -83,8 +83,6 @@ include_directories(${core_SOURCE_DIR}/_inc)
 
 # set(ALL_LIBRARIES ${ALL_LIBRARIES} PRIVATE Boost::dynamic_bitset)
 
-
-
 # 2 - boost # - include tylko tego co potrzeba
 include_directories(_inc/boost)
 
@@ -97,6 +95,28 @@ include_directories(_inc/boost)
 # 6. ./boost/dist/bin/bcp --boost=. boost/dynamic_bitset.hpp /home/womackow/CODE_SPACE/_my_stuff_/cpp/word_bender/_inc/
 
 # ono dumpuje wszystko co jest potrzebne żeby działał dynamic_bitset.hpp bez całości Boost'a
+
+
+
+# 3 - json #
+include(FetchContent)
+FetchContent_Declare(
+    json
+    GIT_REPOSITORY https://github.com/nlohmann/json.git
+    GIT_TAG        master
+    GIT_SHALLOW    TRUE
+    GIT_SUBMODULES_RECURSE TRUE
+    UPDATE_DISCONNECTED ON
+)
+# FetchContent_Populate(json)      # pobiera
+FetchContent_MakeAvailable(json)   # pobiera i buduje ==> Populate + add_subdirectory
+
+set(ALL_LIBRARIES ${ALL_LIBRARIES} nlohmann_json::nlohmann_json)
+include_directories(${json_SOURCE_DIR}/include/nlohmann)
+
+
+
+
 
 
 
