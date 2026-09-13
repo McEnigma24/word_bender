@@ -7,6 +7,8 @@
 #include <map>
 #include <string>
 #include <optional>
+#include <set>
+#include <cmath>
 
 typedef std::unordered_map<std::string, char> check_map_t;
 // typedef std::map<std::string, char> check_map_t;
@@ -227,6 +229,21 @@ class GameState
     {
         i8 x;
         i8 y;
+
+        bool operator==(const xyCoord& other)
+        {
+            return ((this->x == other.x) && (this->y == other.y));
+        }
+        bool operator!=(const xyCoord& other)
+        {
+            return not this->operator==(other);
+        }
+
+        void operator=(const xyCoord& other)
+        {
+            this->x = other.x;
+            this->y = other.y;
+        }
     };
 
     struct WordPositionOnAGameboard
@@ -269,25 +286,17 @@ class GameState
                 }
             }
         }
+
+        void operator=(const WordPositionOnAGameboard& other)
+        {
+            this->start = other.start;
+            this->end = other.end;
+            this->letters = other.letters;
+        }
     };
 
 
     check_map_t check_map;
-
-    GameState()
-    {
-        time_stamp("Starting GameState constructor");
-        {
-
-            check_map = buildCheckMap("input/dict.txt");
-            // auto check_map = buildCheckMap("input/test.txt");
-
-        }
-        time_stamp("check_map - DONE");
-
-        var(check_map.size());
-        // for(auto& [key, value] : check_map) std::cout << key << " : " << (int)value << std::endl;
-    }
 
     gameboard_t mGameboard = {{
 
@@ -310,6 +319,29 @@ class GameState
         { c(3, 0), c(    ), c(    ), c(0, 2), c(    ),           c(    ), c(    ), c(3, 0), c(    ), c(    ),         c(    ), c(0, 2), c(    ), c(    ), c(3, 0) }
 
     }};
+
+    std::vector<char> availableLetters;
+
+    GameState()
+    {
+        time_stamp("Starting GameState constructor");
+        {
+
+            check_map = buildCheckMap("input/dict.txt");
+            // auto check_map = buildCheckMap("input/test.txt");
+
+        }
+        time_stamp("check_map - DONE");
+
+        var(check_map.size());
+        // for(auto& [key, value] : check_map) std::cout << key << " : " << (int)value << std::endl;
+
+
+        // initialize letters on map with JSON input //
+
+        
+    }
+
 
     bool isWordPresentInDict(const std::string& word)
     {
@@ -686,10 +718,6 @@ class GameState
         return sum;
     }
 
-
-
-    std::vector<char> user_letters = { 0 }; // max_number_of_user_letters
-
     // identyfikujemy wszystkie miejsca zaczepu -> pola przez które może przechodzić albo do których można dołączyć litery
     // przedstawimy je jako paski przed i po
     //
@@ -698,24 +726,169 @@ class GameState
 
     // dokładamy kompletnie losowo, po prostu wszystkie kombinacje przechodzimy i kolejność ma znaczenia -> czyli chyba tylko silnia jedno przejście -> jakby 7, 6, 5, 4, i bez powtarzania tej samej litery, czyli właśnie maleje ilość dostępnych
 
-    //
-
-
-    void goingOverAllPossibleCombinations()
+    std::vector<xyCoord> getAllPositionsToCheck(const gameboard_t &pMap)
     {
-        Permutator permute(user_letters);
+        std::set<xyCoord> uniqueCoords;
 
-        int maxStencilSize = std::min(user_letters.size(), 7);
+        // going to every cell with letter and goint around it adding all empty cells
 
-        for(int stencilSize = 1; stencilSize <= maxStencilSize; stencilSize++)
+        const auto max_Y = pMap.size();
+        const auto max_X = pMap[0].size();
+
+        for(int y=0; y < max_Y; y++) for(int x=0; x < max_X; x++)
         {
-            const auto& stencilPermutations = permute.getPermutations(stencilSize);
+            const auto& cell = pMap[y][x];
 
-            // to jest tylko size stencilu -> jeśli mamy
+            if(cell.letter != 0)
+            {
+                // teraz idziemy na około niej góra-dół-lewo-prawo
 
+                for(int yy=y-1; yy < y+1; yy++) for(int xx=x-1; xx < x+1; xx++)
+                {
+                    if(not (0 < yy && yy < gameboard_height)) continue;
+                    if(not (0 < xx && xx < gameboard_width)) continue;
+                    if(yy == y && xx == x) continue;
+                    if(std::abs(yy) == 1 && std::abs(xx) == 1) continue;
+
+                    const auto& check_cell = pMap[yy][xx];
+
+                    if(check_cell.letter == 0)
+                    {
+                        // we add empty cells
+
+                        uniqueCoords.insert(xyCoord(xx, yy));
+                    }
+                }
+            }
         }
     }
 
+    void goingOverAllPossibleCombinations()
+    {
+        const std::vector<xyCoord> allPositionsToCheck = getAllPositionsToCheck(mGameboard);
+
+        Permutator permute(availableLetters);
+        int maxStencilSize = std::min((int)availableLetters.size(), (int)7);
+
+
+        // best move so far //
+        WordPositionOnAGameboard currentBestWord;
+        int currentBestEvaluation = 0;
+
+        for(int stencilSize = 1; stencilSize <= maxStencilSize; stencilSize++)
+        {
+            int distance = stencilSize - 1;
+
+            for(const auto& pos : allPositionsToCheck)
+            {
+                for(const auto& letters : permute.getPermutations(stencilSize))
+                {
+                    // moving stencil across the position -> LEFT to RIGHT //
+                    {
+                        // COPY of gameboard //
+                        auto gameboardCopy = mGameboard;
+
+
+
+                        const int y = pos.y;
+                        int x = std::clamp(pos.x - distance, 0, gameboard_width);
+                        int x_end = std::clamp(pos.x, 0, gameboard_width);
+                        int letters_index = 0;
+
+                        WordPositionOnAGameboard placedWord;
+                        placedWord.start.x = x;
+                        placedWord.start.y = y;
+
+                        for(;(x <= x_end) && (x < gameboard_width); x++)
+                        {
+                            // -> now lets place the letters //
+
+                            if(gameboardCopy[y][x].letter != 0) // cell occupied //
+                            {
+                                x_end++;
+                                continue;
+                            }
+                            else
+                            {
+                                const auto letter = letters[letters_index ++];
+
+                                gameboardCopy[y][x].letter = letter;
+                                placedWord.letters += letter;
+                            }
+                        }
+
+                        placedWord.end.x = x;
+                        placedWord.end.y = y;
+
+                        // now lets evaluate it //
+
+                        auto value = evaluateProposedWordAlredyPutIntoGameBoard(gameboardCopy, placedWord);
+
+                        if(currentBestEvaluation < value)
+                        {
+                            currentBestEvaluation = value;
+                            currentBestWord = placedWord;
+                        }
+                    }
+
+                    // moving stencil across the position ->  UP  to DOWN //
+                    {
+                        // COPY of gameboard //
+                        auto gameboardCopy = mGameboard;
+
+
+
+                        const int x = pos.x;
+                        int y = std::clamp(pos.y - distance, 0, gameboard_height);
+                        int y_end = std::clamp(pos.y, 0, gameboard_height);
+                        int letters_index = 0;
+
+                        WordPositionOnAGameboard placedWord;
+                        placedWord.start.x = x;
+                        placedWord.start.y = y;
+
+                        for(;(y <= y_end) && (y < gameboard_height); y++)
+                        {
+                            // -> now lets place the letters //
+
+                            if(gameboardCopy[y][x].letter != 0) // cell occupied //
+                            {
+                                y_end++;
+                                continue;
+                            }
+                            else
+                            {
+                                const auto letter = letters[letters_index ++];
+
+                                gameboardCopy[y][x].letter = letter;
+                                placedWord.letters += letter;
+                            }
+                        }
+
+                        placedWord.end.x = x;
+                        placedWord.end.y = y;
+
+                        // now lets evaluate it added word //
+
+                        auto value = evaluateProposedWordAlredyPutIntoGameBoard(gameboardCopy, placedWord);
+
+                        if(currentBestEvaluation < value)
+                        {
+                            currentBestEvaluation = value;
+                            currentBestWord = placedWord;
+                        }
+                    }
+                }
+            }
+        }
+
+        line("Found it");
+        varr(currentBestEvaluation.start.x);
+        var(currentBestEvaluation.start.y);
+        varr(currentBestEvaluation.end.x);
+        var(currentBestEvaluation.end.y);
+        var(currentBestEvaluation.letters);
+    }
 };
 
 
