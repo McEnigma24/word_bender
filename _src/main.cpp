@@ -958,6 +958,8 @@ class GameState
         var((int)currentBestWord.start.y);
         varr((int)currentBestWord.end.x);
         var((int)currentBestWord.end.y);
+        
+        var((int)currentBestEvaluation);
 
         var(currentBestWord.letters);
     }
