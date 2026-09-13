@@ -4,7 +4,8 @@
 #include <map>
 #include <string>
 #include <optional>
-#include <bitset>
+// #include <bitset>
+#include <boost/dynamic_bitset.hpp>
 
 typedef std::unordered_map<std::string, char> check_map_t;
 // typedef std::map<std::string, char> check_map_t;
@@ -160,17 +161,20 @@ struct cell
 
 typedef std::array<std::array<cell, gameboard_width>, gameboard_height> gameboard_t;
 
-template<size_t N>
 class Permutator
 {
     const std::vector<char>& input_elements;
+    const size_t N;
 
-    std::bitset<N> flags;
+    // std::bitset<N> flags;
+    boost::dynamic_bitset<char> flags;
     std::string accumulated_elements;
 
     public:
-    Permutator(const std::vector<char>& input_elements)
+    Permutator(const std::vector<char>& input_elements, const size_t& N)
         : input_elements(input_elements)
+        , N(N)
+        , flags(N)
     {
         flags.reset();
         accumulated_elements.reserve(N);
@@ -196,7 +200,10 @@ class Permutator
                     flags.set(i); // block
                     accumulated_elements.push_back(input_elements[i]);
                     {
-                        bodyPermutations(output, (i + 1) % N, depth - 1);
+                        // bodyPermutations(output, (i + 1), depth - 1); -> does not get all combinations
+                        // bodyPermutations(output, (i + 1) % N, depth - 1); -> does not get all combinations
+
+                        bodyPermutations(output, 0, depth - 1);
                     }
                     accumulated_elements.pop_back();
                     flags.reset(i); // un-block
@@ -207,8 +214,6 @@ class Permutator
         {
             // we need to have a separete container that keep the order of added input_elements
             output.push_back(accumulated_elements);
-
-            line("hrere");
         }
     }
 };
@@ -721,7 +726,17 @@ int main(int argc, char* argv[])
 {
     time_stamp("main starting");
 
-    std::vector<char> input_elements{'a', 'b', 'c'};
+    std::vector<char> input_elements{'a', 'b', 'c', 'd', 'e'};
+    for(const auto& e : input_elements)
+    {
+        var(e);
+    }
+    time_stamp("starting");
+
+
+
+
+
     Permutator<3> permute(input_elements);
     for(const auto& permutation : permute.getPermutations(3))
     {

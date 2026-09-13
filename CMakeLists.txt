@@ -59,12 +59,46 @@ FetchContent_Declare(
     GIT_REPOSITORY https://github.com/McEnigma24/CORE_lib.git
     GIT_TAG        main # lub inny tag/commit
     GIT_SHALLOW    TRUE
+    GIT_SUBMODULES_RECURSE TRUE
     UPDATE_DISCONNECTED ON
 )
 FetchContent_MakeAvailable(core)
 
 set(ALL_LIBRARIES ${ALL_LIBRARIES} core)
 include_directories(${core_SOURCE_DIR}/_inc)
+
+
+
+# # 2 - boost # - GIGANT
+# include(FetchContent)
+# FetchContent_Declare(
+#     boost
+#     GIT_REPOSITORY https://github.com/boostorg/boost.git
+#     GIT_TAG        boost-1.86.0  # Używamy konkretnego wydania
+#     GIT_SHALLOW    TRUE
+#     # GIT_SUBMODULES_RECURSE TRUE
+#     UPDATE_DISCONNECTED ON
+# )
+# FetchContent_MakeAvailable(boost)
+
+# set(ALL_LIBRARIES ${ALL_LIBRARIES} PRIVATE Boost::dynamic_bitset)
+
+
+
+# 2 - boost # - include tylko tego co potrzeba
+include_directories(_inc/boost)
+
+# 1. download whole Boost repo
+# 2. ./bootstrap.sh
+# 3. ./b2 tools/bcp
+# 4. ./b2 headers
+# 5. ./b2 headers
+
+# 6. ./boost/dist/bin/bcp --boost=. boost/dynamic_bitset.hpp /home/womackow/CODE_SPACE/_my_stuff_/cpp/word_bender/_inc/
+
+# ono dumpuje wszystko co jest potrzebne żeby działał dynamic_bitset.hpp bez całości Boost'a
+
+
 
 
 
