@@ -4,6 +4,7 @@
 #include <map>
 #include <string>
 #include <optional>
+#include <bitset>
 
 typedef std::unordered_map<std::string, char> check_map_t;
 // typedef std::map<std::string, char> check_map_t;
@@ -159,8 +160,60 @@ struct cell
 
 typedef std::array<std::array<cell, gameboard_width>, gameboard_height> gameboard_t;
 
+template<size_t N>
+class Permutator
+{
+    const std::vector<char>& input_elements;
 
+    std::bitset<N> flags;
+    std::string accumulated_elements;
 
+    public:
+    Permutator(const std::vector<char>& input_elements)
+        : input_elements(input_elements)
+    {
+        flags.reset();
+        accumulated_elements.reserve(N);
+    }
+
+    std::vector<std::string> getPermutations(int depth)
+    {
+        std::vector<std::string> ret;
+
+        bodyPermutations(ret, 0, depth);
+
+        return ret;
+    }
+
+    void bodyPermutations(std::vector<std::string>& output, int i_start, int depth)
+    {
+        if(depth > 0)
+        {
+            for(int i = i_start; i < N; i++)
+            {
+                if(flags.test(i))
+                {
+                    flags.set(i); // block
+                    accumulated_elements.push_back(input_elements[i]);
+                    {
+                        bodyPermutations(output, (i + 1) % N, depth - 1);
+                    }
+                    accumulated_elements.pop_back();
+                    flags.reset(i); // un-block
+                }
+            }
+        }
+        else
+        {
+            // we need to have a separete container that keep the order of added input_elements
+            output.push_back(accumulated_elements);
+
+            line("hrere");
+        }
+    }
+};
+
+#if 0
 class GameState
 {
     struct xyCoord
@@ -184,6 +237,30 @@ class GameState
         bool isWordLeftRight()
         {
             return start.y == end.y;
+        }
+
+        void generateLetters(const gameboard_t &pMap)
+        {
+            letters = "";
+
+            if(isWordLeftRight())
+            {
+                const i8 y = start.y;
+
+                for(i8 x = start.x; x <= end.x; x++)
+                {
+                    letters += (std::string)pMap[y][x].current_letter;
+                }
+            }
+            else if(isWordTopDown())
+            {
+                const i8 x = start.x;
+
+                for(i8 y = start.y; y <= end.y; y++)
+                {
+                    letters += (std::string)pMap[y][x].current_letter;
+                }
+            }
         }
     };
 
@@ -348,50 +425,183 @@ class GameState
             i8 x_min = addedLetters.start.x;
             i8 x_max = addedLetters.end.x;
 
-            i8 y = addedLetters.start.y;
-
             for(i8 x = x_min; x < x_max; x++)
             {
-                // checking if cell -1 or +1 on Y is occupied with old letter
+                i8 y = addedLetters.start.y;
 
+
+
+                // checking if cell -1 or +1 on Y is occupied with old letter
                 // x, y
 
                 auto top_y    = returnClampedCoordToBoard_Y(y, -1);
                 auto bottom_y = returnClampedCoordToBoard_Y(y, +1);
 
-                if (top_y && bottom_y) // both are present -> its for sure not counter as new word
+                const bool top_present_and_not_null       = (top_y && (pMap[top_y.value()]   [x].current_letter != 0));
+                const bool bottom_present_and_not_null = (bottom_y && (pMap[bottom_y.value()][x].current_letter != 0));
+
+                // both are present -> its for sure not counted as new word
+                if (top_present_and_not_null && bottom_present_and_not_null)
                 {
                     continue;
                 }
 
-                if (top_y || bottom_y) // we got ourself w new word
+                if (top_present_and_not_null || bottom_present_and_not_null) // we got ourself w new word
                 {
-                    if (top_y)
+                    if (top_present_and_not_null)
                     {
-                        // we got UP as far are the word goes AND as far as board goes
+                        WordPositionOnAGameboard new_word;
 
-                        ...
+                        // going UP so now we know only the end //
+
+                        new_word.end.x = x;
+                        new_word.end.y = y;
+
+                        // we got UP as far as the word goes AND as far as board goes
+
+                        while(true)
+                        {
+                            y--;
+
+                            if(not (0 <= y)) break;
+                            if(not (pMap[y][x].current_letter != 0)) break;
+                        }
+
+                        // y_max //
+
+                        new_word.start.x = x;
+                        new_word.start.y = y;
+
+                        new_word.generateLetters(pMap);
+
+                        ret.push_back(new_word);
                     }
 
-                    if (bottom_y)
+                    if (bottom_present_and_not_null)
                     {
+                        WordPositionOnAGameboard new_word;
+
+                        // going DOWN so now we know only the start //
+
+                        new_word.start.x = x;
+                        new_word.start.y = y;
+
                         // we got DOWN as far are the word goes AND as far as board goes
 
-                        ...
+                        while(true)
+                        {
+                            y++;
+
+                            if(not (y < gameboard_height)) break;
+                            if(not (pMap[y][x].current_letter != 0)) break;
+                        }
+
+                        // y_max //
+
+                        new_word.end.x = x;
+                        new_word.end.y = y;
+
+                        new_word.generateLetters(pMap);
+
+                        ret.push_back(new_word);
                     }
                 }
             }
         }
         else if (addedLetters.isWordTopDown())
         {
-            // same stuff here
+            i8 y_min = addedLetters.start.y;
+            i8 y_max = addedLetters.end.y;
 
-            ...
+            for(i8 y = y_min; y < y_max; y++)
+            {
+                i8 x = addedLetters.start.x;
+
+
+
+                // checking if cell -1 or +1 on Y is occupied with old letter
+                // x, y
+
+                auto left_x  = returnClampedCoordToBoard_X(x, -1);
+                auto right_x = returnClampedCoordToBoard_X(x, +1);
+
+                const bool left_present_and_not_null   = (left_y && (pMap[y] [left_y.value()].current_letter != 0));
+                const bool right_present_and_not_null = (right_y && (pMap[y][right_y.value()].current_letter != 0));
+
+                // both are present -> its for sure not counted as new word
+                if (left_present_and_not_null && right_present_and_not_null)
+                {
+                    continue;
+                }
+
+                if (left_present_and_not_null || right_present_and_not_null) // we got ourself w new word
+                {
+                    if (left_present_and_not_null)
+                    {
+                        WordPositionOnAGameboard new_word;
+
+                        // going LEFT so now we know only the end //
+
+                        new_word.end.x = x;
+                        new_word.end.y = y;
+
+                        // we got LEFT as far as the word goes AND as far as board goes
+
+                        while(true)
+                        {
+                            x--;
+
+                            if(not (0 <= x)) break;
+                            if(not (pMap[y][x].current_letter != 0)) break;
+                        }
+
+                        // x_max //
+
+                        new_word.start.x = x;
+                        new_word.start.y = y;
+
+                        new_word.generateLetters(pMap);
+
+                        ret.push_back(new_word);
+                    }
+
+                    if (right_present_and_not_null)
+                    {
+                        WordPositionOnAGameboard new_word;
+
+                        // going RIGHT so now we know only the start //
+
+                        new_word.start.x = x;
+                        new_word.start.y = y;
+
+                        // we got RIGHT as far are the word goes AND as far as board goes
+
+                        while(true)
+                        {
+                            x++;
+
+                            if(not (x < gameboard_width)) break;
+                            if(not (pMap[y][x].current_letter != 0)) break;
+                        }
+
+                        // x_max //
+
+                        new_word.end.x = x;
+                        new_word.end.y = y;
+
+                        new_word.generateLetters(pMap);
+
+                        ret.push_back(new_word);
+                    }
+                }
+            }
         }
         else
         {
             CRASH_LOG("fuck !!!");
         }
+
+        return ret;
     }
 
     // jak sprawdzamy to od razu wsadzamy do mapy -> tworzymy kopię mapy za każdym razem kiedy podrzucamy nowe słowo do sprawdzenia
@@ -411,16 +621,63 @@ class GameState
         // 1. added word bonus - check if it adds to other word and count that too
         // 2. additionaly created words bonuses
 
-
-
         // lista nowych słów -> to co dodaliśmy + to co dotworzyliśmy z już istniejacych
         // je trzeba obliczyć osobno i zsumować
 
-        //
+        i16 sum = 0;
+        for(const auto& word : getNewlyCreatedWords(pMap))
+        {
+            i16 singleWordScore = 0;
+
+            i16 wholeWordMultiplyer = 1;
+
+            if(word.isWordLeftRight())
+            {
+                const i8 y = start.y;
+
+                for(i8 x = start.x; x <= end.x; x++)
+                {
+                    auto& cell = pMap[y][x];
+
+                    if(cell.current_letter == 0) CRASH_LOG("FUCK !!!");
+
+                    singleWordScore += (cell.multiplyer_letter * letter_values[cell.current_letter]);
+
+                    if(1 < cell.multiplyer_word)
+                    {
+                        wholeWordMultiplyer *= cell.multiplyer_word;
+                    }
+                }
+            }
+            else if(word.isWordTopDown())
+            {
+                const i8 x = start.x;
+
+                for(i8 y = start.y; y <= end.y; y++)
+                {
+                    auto& cell = pMap[y][x];
+
+                    if(cell.current_letter == 0) CRASH_LOG("FUCK !!!");
+
+                    singleWordScore += (cell.multiplyer_letter * letter_values[cell.current_letter]);
+
+                    if(1 < cell.multiplyer_word)
+                    {
+                        wholeWordMultiplyer *= cell.multiplyer_word;
+                    }
+                }
+            }
+            else { CRASH_LOG("fuck !!!"); }
+
+
+
+            sum += singleWordScore * wholeWordMultiplyer;
+
+            // another word //
+        }
+
+        return sum;
     }
-
-
-
 
 
 
@@ -436,8 +693,21 @@ class GameState
 
     //
 
-};
 
+    void goingOverAllPossibleCombinations()
+    {
+        // generate it combination and then put letters in allowed places //
+
+        for(int stencilSize = 2; stencilSize <= 7; stencilSize++)
+        {
+
+
+            // recursive shit -> stencil will have from 2 to 7 possible combinations -> we have to use this recursive jumping and locking input_elements
+        }
+    }
+
+};
+#endif
 
 
 
@@ -451,27 +721,19 @@ int main(int argc, char* argv[])
 {
     time_stamp("main starting");
 
+    std::vector<char> input_elements{'a', 'b', 'c'};
+    Permutator<3> permute(input_elements);
+    for(const auto& permutation : permute.getPermutations(3))
+    {
+        var(permutation);
+    }
+    time_stamp("ready");
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+    for(const auto& permutation : permute.getPermutations(2))
+    {
+        var(permutation);
+    }
+    time_stamp("ready");
 
     return 0;
 }
