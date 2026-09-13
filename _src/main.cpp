@@ -227,7 +227,7 @@ class GameState
     {
         i8 x;
         i8 y;
-    }
+    };
 
     struct WordPositionOnAGameboard
     {
@@ -236,12 +236,12 @@ class GameState
 
         std::string letters;
 
-        bool isWordTopDown()
+        bool isWordTopDown() const
         {
             return start.x == end.x;
         }
 
-        bool isWordLeftRight()
+        bool isWordLeftRight() const
         {
             return start.y == end.y;
         }
@@ -256,7 +256,7 @@ class GameState
 
                 for(i8 x = start.x; x <= end.x; x++)
                 {
-                    letters += (std::string)pMap[y][x].current_letter;
+                    letters += pMap[y][x].current_letter;
                 }
             }
             else if(isWordTopDown())
@@ -265,7 +265,7 @@ class GameState
 
                 for(i8 y = start.y; y <= end.y; y++)
                 {
-                    letters += (std::string)pMap[y][x].current_letter;
+                    letters += pMap[y][x].current_letter;
                 }
             }
         }
@@ -532,8 +532,8 @@ class GameState
                 auto left_x  = returnClampedCoordToBoard_X(x, -1);
                 auto right_x = returnClampedCoordToBoard_X(x, +1);
 
-                const bool left_present_and_not_null   = (left_y && (pMap[y] [left_y.value()].current_letter != 0));
-                const bool right_present_and_not_null = (right_y && (pMap[y][right_y.value()].current_letter != 0));
+                const bool left_present_and_not_null   = (left_x && (pMap[y][left_x.value()].current_letter != 0));
+                const bool right_present_and_not_null = (right_x && (pMap[y][right_x.value()].current_letter != 0));
 
                 // both are present -> its for sure not counted as new word
                 if (left_present_and_not_null && right_present_and_not_null)
@@ -605,7 +605,7 @@ class GameState
         }
         else
         {
-            CRASH_LOG("fuck !!!");
+            FATAL_ERROR("invalid word orientation");
         }
 
         return ret;
@@ -632,7 +632,7 @@ class GameState
         // je trzeba obliczyć osobno i zsumować
 
         i16 sum = 0;
-        for(const auto& word : getNewlyCreatedWords(pMap))
+        for(const auto& word : getNewlyCreatedWords(pMap, addedLetters))
         {
             i16 singleWordScore = 0;
 
@@ -640,13 +640,13 @@ class GameState
 
             if(word.isWordLeftRight())
             {
-                const i8 y = start.y;
+                const i8 y = word.start.y;
 
-                for(i8 x = start.x; x <= end.x; x++)
+                for(i8 x = word.start.x; x <= word.end.x; x++)
                 {
                     auto& cell = pMap[y][x];
 
-                    if(cell.current_letter == 0) CRASH_LOG("FUCK !!!");
+                    if(cell.current_letter == 0) FATAL_ERROR("empty cell in horizontal word");
 
                     singleWordScore += (cell.multiplyer_letter * letter_values[cell.current_letter]);
 
@@ -658,13 +658,13 @@ class GameState
             }
             else if(word.isWordTopDown())
             {
-                const i8 x = start.x;
+                const i8 x = word.start.x;
 
-                for(i8 y = start.y; y <= end.y; y++)
+                for(i8 y = word.start.y; y <= word.end.y; y++)
                 {
                     auto& cell = pMap[y][x];
 
-                    if(cell.current_letter == 0) CRASH_LOG("FUCK !!!");
+                    if(cell.current_letter == 0) FATAL_ERROR("empty cell in vertical word");
 
                     singleWordScore += (cell.multiplyer_letter * letter_values[cell.current_letter]);
 
@@ -674,7 +674,7 @@ class GameState
                     }
                 }
             }
-            else { CRASH_LOG("fuck !!!"); }
+            else { FATAL_ERROR("invalid word orientation"); }
 
 
 
@@ -688,7 +688,7 @@ class GameState
 
 
 
-    std::vector<char> = { 0 }; // max_number_of_user_letters
+    std::vector<char> user_letters = { 0 }; // max_number_of_user_letters
 
     // identyfikujemy wszystkie miejsca zaczepu -> pola przez które może przechodzić albo do których można dołączyć litery
     // przedstawimy je jako paski przed i po
