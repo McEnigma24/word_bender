@@ -703,13 +703,16 @@ class GameState
 
     void goingOverAllPossibleCombinations()
     {
-        // generate it combination and then put letters in allowed places //
+        Permutator permute(user_letters);
 
-        for(int stencilSize = 2; stencilSize <= 7; stencilSize++)
+        int maxStencilSize = std::min(user_letters.size(), 7);
+
+        for(int stencilSize = 1; stencilSize <= maxStencilSize; stencilSize++)
         {
+            const auto& stencilPermutations = permute.getPermutations(stencilSize);
 
+            // to jest tylko size stencilu -> jeśli mamy
 
-            // recursive shit -> stencil will have from 2 to 7 possible combinations -> we have to use this recursive jumping and locking input_elements
         }
     }
 
@@ -740,6 +743,12 @@ int main(int argc, char* argv[])
     time_stamp("ready");
 
     for(const auto& permutation : permute.getPermutations(2))
+    {
+        var(permutation);
+    }
+    time_stamp("ready");
+
+    for(const auto& permutation : permute.getPermutations(1))
     {
         var(permutation);
     }
