@@ -1,11 +1,12 @@
+// #include <bitset>
+#include <boost/dynamic_bitset.hpp>
+
 #include "__preprocessor__.h"
 
 #include <unordered_map>
 #include <map>
 #include <string>
 #include <optional>
-// #include <bitset>
-#include <boost/dynamic_bitset.hpp>
 
 typedef std::unordered_map<std::string, char> check_map_t;
 // typedef std::map<std::string, char> check_map_t;
@@ -167,13 +168,14 @@ class Permutator
     const size_t N;
 
     // std::bitset<N> flags;
-    boost::dynamic_bitset<char> flags;
+    // boost::dynamic_bitset<char> flags;
+    boost::dynamic_bitset<> flags;
     std::string accumulated_elements;
 
     public:
-    Permutator(const std::vector<char>& input_elements, const size_t& N)
+    Permutator(const std::vector<char>& input_elements)
         : input_elements(input_elements)
-        , N(N)
+        , N(input_elements.size())
         , flags(N)
     {
         flags.reset();
@@ -218,7 +220,7 @@ class Permutator
     }
 };
 
-#if 0
+
 class GameState
 {
     struct xyCoord
@@ -712,7 +714,7 @@ class GameState
     }
 
 };
-#endif
+
 
 
 
@@ -727,17 +729,10 @@ int main(int argc, char* argv[])
     time_stamp("main starting");
 
     std::vector<char> input_elements{'a', 'b', 'c', 'd', 'e'};
-    for(const auto& e : input_elements)
-    {
-        var(e);
-    }
-    time_stamp("starting");
 
 
 
-
-
-    Permutator<3> permute(input_elements);
+    Permutator permute(input_elements);
     for(const auto& permutation : permute.getPermutations(3))
     {
         var(permutation);
