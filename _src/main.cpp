@@ -191,7 +191,7 @@ class Permutator
         {
             for(int i = i_start; i < N; i++)
             {
-                if(flags.test(i))
+                if(not flags.test(i))
                 {
                     flags.set(i); // block
                     accumulated_elements.push_back(input_elements[i]);
