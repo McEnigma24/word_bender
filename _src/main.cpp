@@ -11,62 +11,87 @@
 #include <optional>
 #include <set>
 #include <cmath>
+#include <filesystem>
 
 
 typedef std::unordered_map<std::string, char> check_map_t;
 // typedef std::map<std::string, char> check_map_t;
 
-std::unordered_map<char, i8> letter_values = {
-    {'a', 1},   // 1
-    {'ą', 5},   // 2
-    {'b', 3},   // 3
-    {'c', 2},   // 4
-    {'ć', 6},   // 5
-    {'d', 2},   // 6
-    {'e', 1},   // 7
-    {'ę', 5},   // 8
-    {'f', 4},   // 9
-    {'g', 3},   // 10
-    {'h', 3},   // 11
-    {'i', 1},   // 12
-    {'j', 3},   // 13
-    {'k', 2},   // 14
-    {'l', 2},   // 15
-    {'ł', 3},   // 16
-    {'m', 2},   // 17
-    {'n', 1},   // 18
-    {'ń', 7},   // 19
-    {'o', 1},   // 20
-    {'ó', 5},   // 21
-    {'p', 2},   // 22
-    {'r', 1},   // 23
-    {'s', 1},   // 24
-    {'ś', 5},   // 25
-    {'t', 2},   // 26
-    {'u', 3},   // 27
-    {'w', 1},   // 28
-    {'y', 2},   // 29
-    {'z', 1},   // 30
-    {'ź', 7},   // 31
-    {'ż', 5}    // 32
+std::unordered_map<std::string, i8> letter_values = {
+    {"a", 1},
+    {"ą", 5},
+    {"b", 3},
+    {"c", 2},
+    {"ć", 6},
+    {"d", 2},
+    {"e", 1},
+    {"ę", 5},
+    {"f", 4},
+    {"g", 3},
+    {"h", 3},
+    {"i", 1},
+    {"j", 3},
+    {"k", 2},
+    {"l", 2},
+    {"ł", 3},
+    {"m", 2},
+    {"n", 1},
+    {"ń", 7},
+    {"o", 1},
+    {"ó", 5},
+    {"p", 2},
+    {"r", 1},
+    {"s", 1},
+    {"ś", 5},
+    {"t", 2},
+    {"u", 3},
+    {"w", 1},
+    {"y", 2},
+    {"z", 1},
+    {"ź", 7},
+    {"ż", 5}
 };
 
-bool isLetterInAllowedSet(const char letter)
+size_t utf8CharLen(unsigned char first_byte)
 {
-    // c = std::tolower(static_cast<unsigned char>(c));   // not allowing capital letters  -> we could allow it if we want to
+    if ((first_byte & 0x80) == 0) return 1;
+    if ((first_byte & 0xE0) == 0xC0) return 2;
+    if ((first_byte & 0xF0) == 0xE0) return 3;
+    if ((first_byte & 0xF8) == 0xF0) return 4;
+    return 1;
+}
+
+std::string firstUtf8Letter(const std::string& s)
+{
+    if (s.empty()) return "";
+    return s.substr(0, utf8CharLen(static_cast<unsigned char>(s[0])));
+}
+
+std::string normalizeBoardLetter(const std::string& s)
+{
+    std::string out = firstUtf8Letter(s);
+    if (out.size() == 1)
+        out[0] = static_cast<char>(std::tolower(static_cast<unsigned char>(out[0])));
+    return out;
+}
+
+bool isLetterInAllowedSet(const std::string& letter)
+{
     return letter_values.find(letter) != letter_values.end();
 }
 
 bool isAllowedSet(const std::string& word)
 {
-    for (const char c : word)
+    for (size_t i = 0; i < word.size();)
     {
-        if(not isLetterInAllowedSet(c))
+        const std::string letter = word.substr(i, utf8CharLen(static_cast<unsigned char>(word[i])));
+        if(not isLetterInAllowedSet(letter))
         {
             return false;
         }
+        i += letter.size();
     }
-    return true; // All characters are present in the allowed set
+    return true;
 }
 
 std::vector<std::string> getWordsFromLine(const std::string& line)
@@ -107,40 +132,48 @@ std::vector<std::string> getWordsFromLine(const std::string& line)
     return words;
 }
 
-check_map_t buildCheckMap(const std::string& filename)
+void loadWordsFromDictFile(check_map_t& check_map, const std::string& filename)
 {
-    check_map_t check_map;
-
-    // 1. Create an input file stream object
     std::ifstream file(filename);
-
-    // 2. Check if the file opened successfully
     if (!file.is_open())
     {
-        std::cerr << "Error: Could not open the file.\n";
-        return {};
+        std::cerr << "Error: Could not open the file: " << filename << "\n";
+        return;
     }
 
     std::string line;
-
-    // 3. Read the file line by line until EOF (End Of File)
     while (std::getline(file, line))
     {
-        // Process the line (here we just print it)
-
-        // std::cout << line << '\n';
-
-        // split to different strings by',' and eliminate ' '
-        std::vector<std::string> parts = getWordsFromLine(line);
-
-        for (const std::string& part : parts)
+        for (const std::string& part : getWordsFromLine(line))
         {
             check_map[part] = 0;
         }
     }
+}
 
-    // 4. Close the file (optional, as the ifstream destructor does this automatically)
-    file.close();
+check_map_t buildCheckMap(const std::string& input_directory)
+{
+    check_map_t check_map;
+
+    namespace fs = std::filesystem;
+    const fs::path dir(input_directory);
+
+    if(not fs::is_directory(dir))
+    {
+        std::cerr << "Error: dictionary directory does not exist: " << input_directory << "\n";
+        return {};
+    }
+
+    for(const auto& entry : fs::directory_iterator(dir))
+    {
+        if(not entry.is_regular_file()) continue;
+
+        const std::string filename = entry.path().filename().string();
+        if(filename.compare(0, 5, "dict_") != 0) continue;
+        if(filename.size() <= 9 || filename.substr(filename.size() - 4) != ".txt") continue;
+
+        loadWordsFromDictFile(check_map, entry.path().string());
+    }
 
     return check_map;
 }
@@ -151,7 +184,7 @@ constexpr i8 max_number_of_user_letters = 7;
 
 struct cell
 {
-    char current_letter = 0;
+    std::string current_letter;
     i8 multiplyer_word = 1;
     i8 multiplyer_letter = 1;
 
@@ -349,8 +382,7 @@ class GameState
         time_stamp("Starting GameState constructor");
         {
 
-            check_map = buildCheckMap("input/dict.txt");
-            // auto check_map = buildCheckMap("input/test.txt");
+            check_map = buildCheckMap("input");
 
         }
         time_stamp("check_map - DONE");
@@ -395,7 +427,9 @@ class GameState
                 if (letter.empty())
                     continue;
 
-                availableLetters.push_back(letter[0]);
+                const std::string normalized = normalizeBoardLetter(letter);
+                if (normalized.size() == 1)
+                    availableLetters.push_back(normalized[0]);
             }
         }
 
@@ -410,18 +444,16 @@ class GameState
 
                 for (size_t x = 0; x < board_json[y].size(); x++)
                 {
-                    char letter = 0;
+                    std::string letter;
                     if (board_json[y][x].is_string())
                     {
                         const std::string s = board_json[y][x].get<std::string>();
-                        if (!s.empty())
-                            letter = s[0];
+                        if (!s.empty() && s != " ")
+                            letter = normalizeBoardLetter(s);
                     }
                     // tylko litera — mnożniki zostają z domyślnej planszy
 
-                    if(letter == ' ') letter = 0;
-
-                    mGameboard[y][x].current_letter = (char)std::tolower(letter);
+                    mGameboard[y][x].current_letter = letter;
                 }
             }
         }
@@ -455,17 +487,32 @@ class GameState
                 if(x == -1)     { int val = y+1; if(val<10) pp(""); pp(y+1); continue; }
                 if(x == max_X)  { int val = y+1; pp(y+1); continue; }
 
-                char letter = copyGameboard[y][x].current_letter;
-                if(letter != 0)
+                const auto& letter = copyGameboard[y][x].current_letter;
+                if(not letter.empty())
                 {
                     pp(letter);
-                    if(currentBestWord.isThisCordPresentInWord(xyCoord(x, y))) {letter_index++;}
+                    if(currentBestWord.isThisCordPresentInWord(xyCoord(x, y)))
+                    {
+                        letter_index += static_cast<int>(utf8CharLen(static_cast<unsigned char>(currentBestWord.letters[letter_index])));
+                    }
                 }
                 else
                 {
                     if(currentBestWord.isThisCordPresentInWord(xyCoord(x, y)))
                     {
-                        pp(static_cast<char>(std::toupper(static_cast<unsigned char>(currentBestWord.letters[letter_index++]))));
+                        const std::string placed_letter = currentBestWord.letters.substr(
+                            letter_index,
+                            utf8CharLen(static_cast<unsigned char>(currentBestWord.letters[letter_index])));
+                        letter_index += static_cast<int>(placed_letter.size());
+
+                        if (placed_letter.size() == 1)
+                        {
+                            pp(static_cast<char>(std::toupper(static_cast<unsigned char>(placed_letter[0]))));
+                        }
+                        else
+                        {
+                            pp(placed_letter);
+                        }
                     }
                     else
                     {
@@ -477,7 +524,7 @@ class GameState
         }
     }
 
-    bool isWordPresentInDict(const std::string& word)
+    bool isWordPresentInDict(const std::string& word) const
     {
         return check_map.contains(word);
     }
@@ -503,7 +550,7 @@ class GameState
             {
                 const auto& letter = pMap[y][x].current_letter;
 
-                if(letter == 0)
+                if(letter.empty())
                 {
                     // nothing OR word ended //
 
@@ -544,7 +591,7 @@ class GameState
             {
                 const auto& letter = pMap[y][x].current_letter;
 
-                if(letter == 0)
+                if(letter.empty())
                 {
                     // nothing OR word ended //
 
@@ -596,184 +643,209 @@ class GameState
         return std::nullopt;
     }
 
-    std::vector<WordPositionOnAGameboard> getNewlyCreatedWords(const gameboard_t &pMap, const WordPositionOnAGameboard addedLetters)
+    static std::string wordPositionKey(const WordPositionOnAGameboard& word)
     {
-        std::vector<WordPositionOnAGameboard> ret;
-        ret.push_back(addedLetters); // inserting the added word just by itself
+        return std::to_string(word.start.x) + "," + std::to_string(word.start.y)
+             + "-" + std::to_string(word.end.x) + "," + std::to_string(word.end.y);
+    }
 
+    std::optional<WordPositionOnAGameboard> getPerpendicularWordAt(
+        const gameboard_t& pMap, const i8 x, const i8 y, const bool main_is_horizontal) const
+    {
+        if(pMap[y][x].current_letter.empty()) return std::nullopt;
 
+        WordPositionOnAGameboard word;
 
-        // check if it touches any other letters //
-
-        // +1 and -1      clamped to GameBoardDimentions
-
-        if(addedLetters.isWordLeftRight())
+        if(main_is_horizontal)
         {
-            i8 x_min = addedLetters.start.x;
-            i8 x_max = addedLetters.end.x;
+            i8 y_min = y;
+            while((0 < y_min) && not pMap[y_min - 1][x].current_letter.empty()) y_min--;
 
-            for(i8 x = x_min; x <= x_max; x++)
+            i8 y_max = y;
+            while((y_max < gameboard_height - 1) && not pMap[y_max + 1][x].current_letter.empty()) y_max++;
+
+            if(y_min == y_max) return std::nullopt;
+
+            word.start.x = x;
+            word.start.y = y_min;
+            word.end.x = x;
+            word.end.y = y_max;
+        }
+        else // main word is vertical
+        {
+            i8 x_min = x;
+            while((0 < x_min) && not pMap[y][x_min - 1].current_letter.empty()) x_min--;
+
+            i8 x_max = x;
+            while((x_max < gameboard_width - 1) && not pMap[y][x_max + 1].current_letter.empty()) x_max++;
+
+            if(x_min == x_max) return std::nullopt;
+
+            word.start.x = x_min;
+            word.start.y = y;
+            word.end.x = x_max;
+            word.end.y = y;
+        }
+
+        word.generateLetters(pMap);
+        return word;
+    }
+
+    static i8 effectiveMultiplier(const i8 multiplier)
+    {
+        return (multiplier < 2) ? 1 : multiplier;
+    }
+
+    bool shouldScoreCrossWord(const gameboard_t& pMap, const WordPositionOnAGameboard& word) const
+    {
+        // Score a perpendicular word only when this turn placed at least one of its letters,
+        // and the letters that were already on the board did not already form a legal word.
+
+        bool has_fresh = false;
+        std::string old_subword;
+
+        if(word.isWordLeftRight())
+        {
+            const i8 y = word.start.y;
+
+            for(i8 x = word.start.x; x <= word.end.x; x++)
             {
-                i8 y = addedLetters.start.y;
-
-
-
-                // checking if cell -1 or +1 on Y is occupied with old letter
-                // x, y
-
-                auto top_y    = returnClampedCoordToBoard_Y(y, -1);
-                auto bottom_y = returnClampedCoordToBoard_Y(y, +1);
-
-                const bool top_present_and_not_null       = (top_y && (pMap[top_y.value()]   [x].current_letter != 0));
-                const bool bottom_present_and_not_null = (bottom_y && (pMap[bottom_y.value()][x].current_letter != 0));
-
-                // both are present -> its for sure not counted as new word
-                if (top_present_and_not_null && bottom_present_and_not_null)
-                {
-                    continue;
-                }
-
-                if (top_present_and_not_null || bottom_present_and_not_null) // we got ourself w new word
-                {
-                    if (top_present_and_not_null)
-                    {
-                        WordPositionOnAGameboard new_word;
-
-                        // going UP so now we know only the end //
-
-                        new_word.end.x = x;
-                        new_word.end.y = y;
-
-                        // we got UP as far as the word goes AND as far as board goes
-
-                        while((0 < y) && (pMap[y - 1][x].current_letter != 0))
-                        {
-                            y--;
-                        }
-
-                        // y_max //
-
-                        new_word.start.x = x;
-                        new_word.start.y = y;
-
-                        new_word.generateLetters(pMap);
-
-                        ret.push_back(new_word);
-                    }
-
-                    if (bottom_present_and_not_null)
-                    {
-                        WordPositionOnAGameboard new_word;
-
-                        // going DOWN so now we know only the start //
-
-                        new_word.start.x = x;
-                        new_word.start.y = y;
-
-                        // we got DOWN as far are the word goes AND as far as board goes
-
-                        while((y < gameboard_height - 1) && (pMap[y + 1][x].current_letter != 0))
-                        {
-                            y++;
-                        }
-
-                        // y_max //
-
-                        new_word.end.x = x;
-                        new_word.end.y = y;
-
-                        new_word.generateLetters(pMap);
-
-                        ret.push_back(new_word);
-                    }
-                }
+                if(pMap[y][x].fleshlyAdded) has_fresh = true;
+                else old_subword += pMap[y][x].current_letter;
             }
         }
-        else if (addedLetters.isWordTopDown())
+        else if(word.isWordTopDown())
         {
-            i8 y_min = addedLetters.start.y;
-            i8 y_max = addedLetters.end.y;
+            const i8 x = word.start.x;
 
-            for(i8 y = y_min; y <= y_max; y++)
+            for(i8 y = word.start.y; y <= word.end.y; y++)
             {
-                i8 x = addedLetters.start.x;
-
-
-
-                // checking if cell -1 or +1 on Y is occupied with old letter
-                // x, y
-
-                auto left_x  = returnClampedCoordToBoard_X(x, -1);
-                auto right_x = returnClampedCoordToBoard_X(x, +1);
-
-                const bool left_present_and_not_null   = (left_x && (pMap[y][left_x.value()].current_letter != 0));
-                const bool right_present_and_not_null = (right_x && (pMap[y][right_x.value()].current_letter != 0));
-
-                // both are present -> its for sure not counted as new word
-                if (left_present_and_not_null && right_present_and_not_null)
-                {
-                    continue;
-                }
-
-                if (left_present_and_not_null || right_present_and_not_null) // we got ourself w new word
-                {
-                    if (left_present_and_not_null)
-                    {
-                        WordPositionOnAGameboard new_word;
-
-                        // going LEFT so now we know only the end //
-
-                        new_word.end.x = x;
-                        new_word.end.y = y;
-
-                        // we got LEFT as far as the word goes AND as far as board goes
-
-                        while((0 < x) && (pMap[y][x - 1].current_letter != 0))
-                        {
-                            x--;
-                        }
-
-                        // x_max //
-
-                        new_word.start.x = x;
-                        new_word.start.y = y;
-
-                        new_word.generateLetters(pMap);
-
-                        ret.push_back(new_word);
-                    }
-
-                    if (right_present_and_not_null)
-                    {
-                        WordPositionOnAGameboard new_word;
-
-                        // going RIGHT so now we know only the start //
-
-                        new_word.start.x = x;
-                        new_word.start.y = y;
-
-                        // we got RIGHT as far are the word goes AND as far as board goes
-
-                        while((x < gameboard_width - 1) && (pMap[y][x + 1].current_letter != 0))
-                        {
-                            x++;
-                        }
-
-                        // x_max //
-
-                        new_word.end.x = x;
-                        new_word.end.y = y;
-
-                        new_word.generateLetters(pMap);
-
-                        ret.push_back(new_word);
-                    }
-                }
+                if(pMap[y][x].fleshlyAdded) has_fresh = true;
+                else old_subword += pMap[y][x].current_letter;
             }
         }
         else
         {
+            return false;
+        }
+
+        if(not has_fresh) return false;
+        if(old_subword.size() < 2) return true;
+
+        return not isWordPresentInDict(old_subword);
+    }
+
+    i16 scoreWordOnMap(gameboard_t& pMap, const WordPositionOnAGameboard& word)
+    {
+        i16 singleWordScore = 0;
+        i16 wholeWordMultiplyer = 1;
+
+        if(word.isWordLeftRight())
+        {
+            const i8 y = word.start.y;
+
+            for(i8 x = word.start.x; x <= word.end.x; x++)
+            {
+                auto& cell = pMap[y][x];
+
+                if(cell.current_letter.empty()) FATAL_ERROR("empty cell in horizontal word");
+
+                const i8 letter_multiplier = cell.fleshlyAdded
+                    ? effectiveMultiplier(cell.multiplyer_letter)
+                    : 1;
+                singleWordScore += (letter_multiplier * letter_values.at(cell.current_letter));
+
+                if(cell.fleshlyAdded)
+                {
+                    const i8 word_multiplier = effectiveMultiplier(cell.multiplyer_word);
+                    if(word_multiplier > 1) wholeWordMultiplyer *= word_multiplier;
+                }
+
+                if(not cell.fleshlyAdded)
+                {
+                    cell.multiplyer_letter = 1;
+                    cell.multiplyer_word = 1;
+                }
+            }
+        }
+        else if(word.isWordTopDown())
+        {
+            const i8 x = word.start.x;
+
+            for(i8 y = word.start.y; y <= word.end.y; y++)
+            {
+                auto& cell = pMap[y][x];
+
+                if(cell.current_letter.empty()) FATAL_ERROR("empty cell in vertical word");
+
+                const i8 letter_multiplier = cell.fleshlyAdded
+                    ? effectiveMultiplier(cell.multiplyer_letter)
+                    : 1;
+                singleWordScore += (letter_multiplier * letter_values.at(cell.current_letter));
+
+                if(cell.fleshlyAdded)
+                {
+                    const i8 word_multiplier = effectiveMultiplier(cell.multiplyer_word);
+                    if(word_multiplier > 1) wholeWordMultiplyer *= word_multiplier;
+                }
+
+                if(not cell.fleshlyAdded)
+                {
+                    cell.multiplyer_letter = 1;
+                    cell.multiplyer_word = 1;
+                }
+            }
+        }
+        else { FATAL_ERROR("invalid word orientation"); }
+
+        return singleWordScore * wholeWordMultiplyer;
+    }
+
+    std::vector<WordPositionOnAGameboard> getNewlyCreatedWords(const gameboard_t &pMap, const WordPositionOnAGameboard addedLetters)
+    {
+        std::vector<WordPositionOnAGameboard> ret;
+        ret.push_back(addedLetters);
+
+        const bool main_is_horizontal = addedLetters.isWordLeftRight();
+        if(not main_is_horizontal && not addedLetters.isWordTopDown())
+        {
             FATAL_ERROR("invalid word orientation");
+        }
+
+        std::set<std::string> seen_words;
+        seen_words.insert(wordPositionKey(addedLetters));
+
+        if(main_is_horizontal)
+        {
+            for(i8 x = addedLetters.start.x; x <= addedLetters.end.x; x++)
+            {
+                const i8 y = addedLetters.start.y;
+                const auto cross_word = getPerpendicularWordAt(pMap, x, y, true);
+                if(not cross_word) continue;
+                if(not shouldScoreCrossWord(pMap, cross_word.value())) continue;
+
+                const auto key = wordPositionKey(cross_word.value());
+                if(seen_words.contains(key)) continue;
+
+                seen_words.insert(key);
+                ret.push_back(cross_word.value());
+            }
+        }
+        else
+        {
+            for(i8 y = addedLetters.start.y; y <= addedLetters.end.y; y++)
+            {
+                const i8 x = addedLetters.start.x;
+                const auto cross_word = getPerpendicularWordAt(pMap, x, y, false);
+                if(not cross_word) continue;
+                if(not shouldScoreCrossWord(pMap, cross_word.value())) continue;
+
+                const auto key = wordPositionKey(cross_word.value());
+                if(seen_words.contains(key)) continue;
+
+                seen_words.insert(key);
+                ret.push_back(cross_word.value());
+            }
         }
 
         return ret;
@@ -799,56 +871,12 @@ class GameState
         // lista nowych słów -> to co dodaliśmy + to co dotworzyliśmy z już istniejacych
         // je trzeba obliczyć osobno i zsumować
 
+        gameboard_t scoringMap = pMap;
+
         i16 sum = 0;
-        for(const auto& word : getNewlyCreatedWords(pMap, addedLetters))
+        for(const auto& word : getNewlyCreatedWords(scoringMap, addedLetters))
         {
-            i16 singleWordScore = 0;
-
-            i16 wholeWordMultiplyer = 1;
-
-            if(word.isWordLeftRight())
-            {
-                const i8 y = word.start.y;
-
-                for(i8 x = word.start.x; x <= word.end.x; x++)
-                {
-                    auto& cell = pMap[y][x];
-
-                    if(cell.current_letter == 0) FATAL_ERROR("empty cell in horizontal word");
-
-                    singleWordScore += (cell.multiplyer_letter * letter_values[cell.current_letter]);
-
-                    if(1 < cell.multiplyer_word)
-                    {
-                        wholeWordMultiplyer *= cell.multiplyer_word;
-                    }
-                }
-            }
-            else if(word.isWordTopDown())
-            {
-                const i8 x = word.start.x;
-
-                for(i8 y = word.start.y; y <= word.end.y; y++)
-                {
-                    auto& cell = pMap[y][x];
-
-                    if(cell.current_letter == 0) FATAL_ERROR("empty cell in vertical word");
-
-                    singleWordScore += (cell.multiplyer_letter * letter_values[cell.current_letter]);
-
-                    if(1 < cell.multiplyer_word)
-                    {
-                        wholeWordMultiplyer *= cell.multiplyer_word;
-                    }
-                }
-            }
-            else { FATAL_ERROR("invalid word orientation"); }
-
-
-
-            sum += singleWordScore * wholeWordMultiplyer;
-
-            // another word //
+            sum += scoreWordOnMap(scoringMap, word);
         }
 
         return sum;
@@ -871,7 +899,7 @@ class GameState
         {
             const auto& cell = pMap[y][x];
 
-            if(cell.current_letter != 0)
+            if(not cell.current_letter.empty())
             {
                 wholeMapIsEmpty = false;
                 // teraz idziemy na około niej góra-dół-lewo-prawo
@@ -885,7 +913,7 @@ class GameState
 
                     const auto& check_cell = pMap[yy][xx];
 
-                    if(check_cell.current_letter == 0)
+                    if(check_cell.current_letter.empty())
                     {
                         // we add empty cells
 
@@ -930,8 +958,8 @@ class GameState
 
 
                         const int y = pos.y;
-                        int x = std::clamp(static_cast<int>(pos.x) - distance, 0, static_cast<int>(gameboard_width));
-                        int x_end = std::clamp(static_cast<int>(pos.x), 0, static_cast<int>(gameboard_width));
+                        int x = std::clamp(static_cast<int>(pos.x) - distance, 0, static_cast<int>(gameboard_width) - 1);
+                        int x_end = std::clamp(static_cast<int>(pos.x), 0, static_cast<int>(gameboard_width) - 1);
                         int letters_index = 0;
 
                         WordPositionOnAGameboard placedWord;
@@ -942,7 +970,7 @@ class GameState
                         {
                             // -> now lets place the letters //
 
-                            if(gameboardCopy[y][x].current_letter != 0) // cell occupied //
+                            if(not gameboardCopy[y][x].current_letter.empty()) // cell occupied //
                             {
                                 x_end++;
                                 placedWord.letters += gameboardCopy[y][x].current_letter;
@@ -952,7 +980,8 @@ class GameState
                             {
                                 const auto letter = letters[letters_index ++];
 
-                                gameboardCopy[y][x].current_letter = letter;
+                                gameboardCopy[y][x].current_letter = std::string(1, letter);
+                                gameboardCopy[y][x].fleshlyAdded = true;
                                 placedWord.letters += letter;
                             }
                         }
@@ -979,8 +1008,8 @@ class GameState
 
 
                         const int x = pos.x;
-                        int y = std::clamp(static_cast<int>(pos.y) - distance, 0, static_cast<int>(gameboard_height));
-                        int y_end = std::clamp(static_cast<int>(pos.y), 0, static_cast<int>(gameboard_height));
+                        int y = std::clamp(static_cast<int>(pos.y) - distance, 0, static_cast<int>(gameboard_height) - 1);
+                        int y_end = std::clamp(static_cast<int>(pos.y), 0, static_cast<int>(gameboard_height) - 1);
                         int letters_index = 0;
 
                         WordPositionOnAGameboard placedWord;
@@ -991,7 +1020,7 @@ class GameState
                         {
                             // -> now lets place the letters //
 
-                            if(gameboardCopy[y][x].current_letter != 0) // cell occupied //
+                            if(not gameboardCopy[y][x].current_letter.empty()) // cell occupied //
                             {
                                 y_end++;
                                 placedWord.letters += gameboardCopy[y][x].current_letter;
@@ -1001,7 +1030,8 @@ class GameState
                             {
                                 const auto letter = letters[letters_index ++];
 
-                                gameboardCopy[y][x].current_letter = letter;
+                                gameboardCopy[y][x].current_letter = std::string(1, letter);
+                                gameboardCopy[y][x].fleshlyAdded = true;
                                 placedWord.letters += letter;
                             }
                         }
@@ -1023,6 +1053,12 @@ class GameState
             }
         }
 
+        if(currentBestEvaluation <= 0)
+        {
+            p("No valid move found.");
+            return;
+        }
+
         line("Found it");
         varr((int)currentBestWord.start.x);
         var((int)currentBestWord.start.y);
@@ -1032,7 +1068,6 @@ class GameState
         var((int)currentBestEvaluation);
 
         var(currentBestWord.letters);
-
 
         printGameBoard(currentBestWord);
     }
